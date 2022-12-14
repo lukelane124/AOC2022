@@ -41,9 +41,9 @@ int insert(char* line)
             else
             {
                 if ((map[in] == 0) &&
-                    (map[*(line-1)] == 1) &&
                     (map[*(line-2)] == 1) &&
-                    (map[*(line-3)] == 1)
+                    (map[*(line-3)] == 1) &&
+                    (map[*(line-4)] == 1)
                 )
                 {
                     return size;
