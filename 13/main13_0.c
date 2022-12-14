@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,6 +37,43 @@ struct list
 };
 typedef struct list list;
 
+void _list_print(FILE* F, list* List)
+{
+    int isFirst = 1;
+    fprintf(F, "[");
+    element* E;
+    list* L;
+    integer* I;
+    for (int i = 0; i < List->nUsed; i++)
+    {
+        E = &List->Es[i];
+        if (!isFirst)
+        {
+            fprintf(F,", ");
+        }
+        switch(E->t)
+        {
+            case TYPE_INT:
+            {
+                I = (integer*) E;
+                fprintf(F, "%d", I->value);
+                break;
+            }
+            case TYPE_LIST:
+            {
+                L = (list*) E;
+                _list_print(F,L);
+            }
+        }
+       
+    }
+}
+
+void list_print(list* L)
+{
+    _list_print(stderr, L);
+}
+
 list* list_create(void)
 {
     list* ret = malloc(sizeof(list));
@@ -49,7 +87,7 @@ list* list_create(void)
     return ret;
 }
 
-list_add_element(list* L, element* E)
+void list_add_element(list* L, element* E)
 {
     if (L->nUsed >= L->nAlloc)
     {
@@ -71,13 +109,7 @@ integer* integer_create(int value)
         ret->e.t = TYPE_INT;
         ret->value = value;
     }
-}
-
-list* integer_promote_list(integer* I)
-{
-    list* l = list_create();
-    list_add_element(l, (element*) I);
-    return l;
+    return ret;
 }
 
 void _populate_list(char** Line, list* L)
@@ -116,14 +148,57 @@ void _populate_list(char** Line, list* L)
     }
 }
 
-list* processLineToList(char* line)
+element* _processChars(char** Line)
 {
+    element* ret = NULL;
+    char* line = *Line;
+    if (isdigit(*line))
+    {
+        integer* I = integer_create(*line);
+        line++;
+        *Line = line;
+        ret = (element*) I;
+    }
+
+    return ret;
+}
+
+list* processLineToList(char** Line)
+{
+    char*  line = *Line;
     list* ret = list_create();
     if (ret)
     {
-        line++;
-        _populate_list(&line, ret);
+        while(*line != '\0')
+        {
+            switch (*line++)
+            {
+                case '[':
+                {
+                    list_add_element(ret, (element*) processLineToList(&line));
+                    break;
+                }
+                case ']':
+                {
+                    *Line = line;
+                    return ret;
+                }
+                case ',':
+                {
+                    continue;
+                    break;
+                }
+                default:
+                {
+                    list_add_element(ret, _processChars(&line));
+                }
+            }
+        }
+        
+        
+        list_print(ret);
     }
+    return ret;
 }
 
 int main(int argc, char** argv, char** envp)
@@ -151,25 +226,26 @@ int main(int argc, char** argv, char** envp)
         unsigned int outOfOrderIndexRunning = 0;
         int currentIndex = 1;
         
-        char* firstPacketLine = NULL;
+        char* l1 = NULL;
         size_t firstPacketLength = 0;
 
-        char* secondPacketLine = NULL;
+        char* l2 = NULL;
         size_t secondPacketLength = 0;
 
         while(!feof(fIn))
         {
             
-            nChars = getline(&firstPacketLine, &firstPacketLength, fIn);
-            list* l1 = processLineToList(firstPacketLine);
+            nChars = getline(&l1, &firstPacketLength, fIn);
+            list* L1 = processLineToList(&l1);
 
-            nChars = getline(&secondPacketLine, &secondPacketLength, fIn);
-            list* l2 = processLineToList(secondPacketLine);
+            nChars = getline(&l2, &secondPacketLength, fIn);
+            list* L2 = processLineToList(&l2);
+
+            
 
             currentIndex++;
         }
 
-        free(line);
         fclose(fIn);
         fIn = NULL;
 
